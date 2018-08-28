@@ -1,19 +1,19 @@
 # wiki
-A wiki html generator in Nim ( v 0.18.0 )
+### A wiki html generator in Nim ( v 0.18.0 )**
 
 From a single exe, will generates static site from a set of markdown-like files.
 
-(Probably not useful to many, I made it for my own use)
+_(Probably not useful to many, I made it for my own use)_
 
 After installing nim, to Build:
 
-nim c wiki.nim
+`nim c wiki.nim`
 
 an executable will be produced (wiki.exe on windows).
 
 To generate pages:
 
-wiki  <src-dir>  <dest-dir>
+`wiki  <src-dir>  <dest-dir>`
 
 This tool was my attempt to stop using wikipad, so I exported those wiki files and parsed them into the following format:
 
