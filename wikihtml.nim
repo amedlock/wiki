@@ -197,7 +197,7 @@ method to_html( writer:HtmlWriter, code: Code ) : string =
   let tag =  make_tag("pre").add_class("wiki-code").indent(code)
   for i,x in code.lines:
     let gutter = "span".make_tag.add_class("gutter").add( $(i+1) )
-    let pre = "code".make_tag.add( x )
+    let pre = "code".make_tag.add( x.escape_html )
     let row = "div".make_tag.add( gutter ).add( pre )
     discard tag.add( row )
   return $tag
