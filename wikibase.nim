@@ -329,10 +329,12 @@ proc parse_chunks( p: Parser, lines: var Deque[string] ) =
       var 
         pos = 2
         size = 1
-      while pos < len(t) and size < 5:
+      while pos < len(t) and size < 5 and t[pos]=='+':
         if t[pos]!='+':
           break
-        inc(pos)
+        else:
+          inc(pos)
+          inc(size)
       p.add_chunk( make_title( t.skip(pos), size ) )
     elif t.startsWith("=="):
       p.parse_table(t.skip(2), lines)
