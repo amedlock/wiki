@@ -27,7 +27,7 @@ type
 
   # single line of styled text
   Text* = ref object of Chunk
-    spans*: Span
+    content*: string
 
   # line of text which is subdued 
   Comment* = ref object of Chunk
@@ -46,7 +46,7 @@ type
     body*: seq[RowChunk]
 
   Cell* = ref object of Chunk
-    spans*: Span
+    content*: string
 
   Title* = ref object of Chunk
     size*: 1..5
@@ -58,19 +58,6 @@ type
   NList* = ref object of Chunk
     items*: seq[Text]
 
-
-  # missing strikeout style
-  SpanStyle* = enum
-    Raw,        # unformatted text 
-    Bold,       
-    Italic,     
-    Link        
-
-  Span* = ref object
-    styles*: set[SpanStyle]
-    text*: string
-    next*: Span
-
   # Parser object for my wiki dialect
   Parser* = ref object 
     page*: Page
@@ -80,9 +67,6 @@ type
 
    
 
-proc parse_spans*( line : string, styles: set[SpanStyle] = {} ) : Span
-
-
 # create a new page 
 proc make_page( wiki:Wiki, name, filename : string ) : Page =
   assert( name.len > 0 )
@@ -91,7 +75,7 @@ proc make_page( wiki:Wiki, name, filename : string ) : Page =
   wiki.pages[name] =  result 
   wiki.lc_names[name.replace("_").toLowerAscii] = result
 
-proc make_text( txt: string ) : Text = Text( spans: txt.parse_spans() )
+proc make_text( txt: string ) : Text = Text( content: txt )
 
 proc make_code(lang: string) : Code = Code(lang:lang, lines: @[])
 
@@ -102,7 +86,7 @@ proc make_row(): RowChunk = RowChunk( cells: @[] )
 proc make_table() : TableChunk = TableChunk( body: @[] )
 
 proc add_cell( row: RowChunk, txt :string ) =
-  row.cells.add( Cell(spans: txt.parse_spans() ) )
+  row.cells.add( Cell( content: txt ) )
 
 proc add( tbl: TableChunk, tr: RowChunk ) =
   tbl.body.add( tr )
@@ -180,84 +164,6 @@ proc add_chunk*( p: Parser, chunk: Chunk ) =
   chunk.pos = len(p.chunks)
   p.chunks.add( chunk )
 
-
-## ----------------- Span parsing code -----------------
-
-proc len*( s : Span ): int = 
-  if s!=nil: 
-    result = 1 + len(s.next)
-
-
-method `$`*( s: Span ): string {.base.} =
-  if s==nil: return "<nil>"
-  result = "Span($1,text:$2)".format( s.styles, s.text )
-  if s.next!=nil:
-    result &= "\n$1".format( $s.next )
-
-
-proc makeSpan( text: string, styles: set[SpanStyle]) : Span =
-  new(result)
-  result.styles = styles
-  result.text = text
-
-const Specials = {'*', '_', '`', '['}
-
-proc parse_inner( line : string, pos: int, styles: set[SpanStyle] = {} ) : Span
-
-proc parse_raw( line : string, pos: int, styles: set[SpanStyle] ) : Span =
-  var last = line.find('`', pos)
-  let rawStyle = styles + { SpanStyle.Raw }
-  if last < 0:
-    return makeSpan(line, rawStyle)
-  else:
-    if last-1 >= pos:
-      result = makeSpan(line[pos .. last-1], rawStyle )
-    if last < len(line)-1:
-      result.next = line.parse_inner( last+1, styles )
-
-proc parse_link( line : string, pos: int, styles: set[SpanStyle] ) : Span =
-  var last = line.find(']', pos+1 )
-  let linkStyle = styles + { SpanStyle.Link }
-  if last < 0 or last==pos+1:
-    result = line.parse_inner( pos+1, styles );
-    if result!=nil: result.text = '[' & result.text # hacky but works
-  else:
-    result = makeSpan(line[pos .. last-1], linkStyle )
-    if last < len(line)-1:
-      result.next = line.parse_inner( last+1, styles )
-
-proc toggle( styles: set[SpanStyle], s : SpanStyle ) : set[SpanStyle] = 
-  if s in styles:
-    return styles - {s}
-  else:
-    return styles + {s}
-
-
-proc parse_inner( line : string, pos: int, styles: set[SpanStyle] = {} ) : Span =
-  if pos >= line.len: return nil
-  echo( "line:" & line[pos..line.len-1] )
-  let next = line.find(Specials, pos)
-  echo( "tail:" & line[next+1..line.len-1])
-  if next<0:
-    return makeSpan(line[pos..line.len-1], styles)
-  result = makeSpan( line[pos..next-1], styles )
-  if line[next]=='*':
-    result.next = line.parse_inner( next+1, styles.toggle( SpanStyle.Bold) )
-  elif line[next]=='_':
-    result.next = line.parse_inner( next+1, styles.toggle( SpanStyle.Italic) )
-  elif line[next]=='`':
-    result.next = line.parse_raw(next+1, styles )
-  elif line[next]=='[':
-    result.next = line.parse_link(next+1, styles)
-
-
-# Parse text into a linked list of spans with zero or more styles
-proc parse_spans*( line : string, styles : set[SpanStyle] ) : Span =
-  if line=="": return nil
-  return line.parse_inner( 0, styles )
-
-
-## ----------------- Chunk parsing code -----------------
 
 # skip some number of characters of s
 proc skip( s: string, n : int ) : string =

@@ -1,4 +1,4 @@
-import tables, strutils, sequtils, strformat, strtabs, sets, os;
+import tables, strutils, sequtils, parseutils, strformat, strtabs, sets, os;
 import wikibase, wikitemplate
 
 ## Wiki HTML generation Code
@@ -151,27 +151,6 @@ proc write_page( writer: HtmlWriter, filename, title, body, header : string ) =
 proc add_folder( writer:HtmlWriter, name, pname: string ) =
   writer.get_folder(name).add( pname )
 
-proc is_external_link( s : string ) : bool =
-  result = s.startsWith("http://") or s.startsWith("https://")
-    
-proc create_link( writer: HtmlWriter, txt : string ) : Markup =
-  if txt.len==0:
-    return CData(value: "&nbsp;")
-  var 
-    label = txt.strip()
-    href = label
-  if label.contains( '|' ):
-    let tok = label.split('|',1)
-    label = tok[0].strip()
-    href = tok[1].strip()
-  if not href.toLowerAscii.is_external_link:
-    let page = writer.find_page( href )
-    if page==nil:
-      return make_tag("[$1]".format( label ) ) # give up
-    else:
-      href = page.name & ".html"
-  return wiki_link(href, escape_html(label))
-
 
 # sets the indent on a tag based on chunk's margin value
 proc indent( t : Tag, ch: Chunk ) : Tag =
@@ -179,17 +158,17 @@ proc indent( t : Tag, ch: Chunk ) : Tag =
     discard t.add_class("indent$1".format(ch.margin))
   return t
 
-proc to_html( writer:HtmlWriter, span: Span ) : string
+proc content_to_html( writer: HtmlWriter, content: string ) : string;
 
 method to_html( writer:HtmlWriter, chunk: Chunk ) : string {.base.} = "<!-- Not implemented -->"
 
 method to_html( writer:HtmlWriter, comment: Comment ) : string = "<!-- $1 -->".format( comment.text )
 
 method to_html( writer:HtmlWriter, text: Text ) : string = 
-  result = $"div".make_tag.indent(text).add( writer.to_html( text.spans ) )
+  result = "<div>$1</div>".format( writer.content_to_html( text.content ))
 
 method to_html( writer:HtmlWriter, cell: Cell ) : string = 
-  result = writer.to_html( cell.spans )
+  result = writer.content_to_html( cell.content )
 
 method to_html( writer:HtmlWriter, code: Code ) : string =
   let tag =  make_tag("pre").add_class("wiki-code").indent(code)
@@ -231,34 +210,86 @@ method to_html( writer:HtmlWriter, title: Title ) : string =
   return $tag.add( writer.to_html( title.text ) )
 
 
-proc to_tag( writer:HtmlWriter, span: Span ) : Markup =
-  if SpanStyle.Raw in span.styles:
-    return make_tag("span").add( span.text.escape_html ) # raw = no styles
-  var tag : Tag
-  if SpanStyle.Bold in span.styles:
-    tag = tag.make_tag("b")
-  if SpanStyle.Italic in span.styles:
-    tag = tag.make_tag("i")
-  if SpanStyle.Link in span.styles:
-    let a = writer.create_link( span.text )
-    if tag==nil: 
-      return a
+## ----------------- Content To Html -----------------
+
+const Specials = {'*', '_', '`', '['}
+
+const HtmlChars = {'<': "&lt;",
+                   '>': "&gt;",
+                   '"': "&quot;",
+                   '&': "&amp;", 
+                   '\'': "&apos;" }.toTable
+
+proc parse_link( pos: var int, text: string ) : string = 
+  let sz = text.parseUntil( result, ']', pos ) 
+  if sz>0:
+    pos += (sz+1)
+
+proc parse_raw( pos: var int, text: string ) : string = 
+  let sz = text.parseUntil( result, '`', pos )
+  if sz>0:
+    pos += (sz+1)
+
+
+proc is_external_link( s : string ) : bool =
+  result = s.startsWith("http://") or s.startsWith("https://")
+    
+proc create_link( writer: HtmlWriter, txt : string ) : string =
+  echo "Link:$1".format( txt )
+  if txt.len==0:
+    return "<a href='#'>(Empty Link)</a>"
+  var 
+    label = txt.strip()
+    href = label
+  if label.contains( '|' ):
+    let tok = label.split('|',1)
+    label = tok[0].strip()
+    href = tok[1].strip()
+  if not href.toLowerAscii.is_external_link:
+    let page = writer.find_page( href )
+    if page==nil:
+      return $make_tag("[$1]".format( label ) ) # give up
     else:
-      return tag.add( a )
-  let esc = escape_html( span.text ) 
-  if tag==nil: 
-    return CData(value: esc)
+      href = page.name & ".html"
+  return $wiki_link(href, escape_html(label))
+
+proc close_all_tags( styles: set[char]) : string = 
+  if '*' in styles:
+    result &= "</b>"
+  if '_' in styles:
+    result &= "</i>"
+
+proc gen_style_tag( ch: char, styles: var set[char], openTag, closeTag: string ) : string =
+  if ch in styles:
+    excl( styles, ch )
+    result = closeTag
   else:
-    return tag.add( esc )
+    incl( styles, ch )
+    result = openTag
 
-
-# Convert all spans in a list to html string
-proc to_html( writer: HtmlWriter, span: Span ) : string =
+proc content_to_html( writer: HtmlWriter, content: string ) : string = 
   result = ""
-  var cur = span
-  while cur!=nil:
-    result &= $writer.to_tag(cur)
-    cur = cur.next
+  var styles : set[char] = {}
+  var pos = 0
+  while pos < content.len:
+    let ch = content[pos]
+    inc(pos)
+    if ch=='[':
+      let linkText = parse_link( pos, content )
+      result &= $writer.create_link( linkText )
+    elif ch=='`':
+      let rawText = parse_raw( pos, content )
+      result &= styles.close_all_tags()
+      result &= $make_tag("span").add( rawText.escape_html )
+    elif ch=='*':
+      result &= gen_style_tag( ch, styles, "<b>", "</b>")
+    elif ch=='_':
+      result &= gen_style_tag( ch, styles, "<i>", "</i>")
+    elif ch in HtmlChars:
+      result &= HtmlChars[ch]
+    else:
+      result &= ch
+
 
 proc generate_html( writer:HtmlWriter, page: Page ) : string = 
   var parser = page.parse()
@@ -274,7 +305,6 @@ proc generate_index*( writer: HtmlWriter )
 proc generate*( writer: HtmlWriter ) =  
   if not dirExists( writer.dest_path ):
     createDir( writer.dest_path )
-  #copyFile( joinPath( getAppDir(), "styles.css") , joinPath(writer.dest_path, "styles.css"))
   writeFile( joinPath(writer.dest_path, "styles.css"), styleCSS )
   writer.folders.clear()
   let index_link = wide_button("index.html", "Back to Index")
