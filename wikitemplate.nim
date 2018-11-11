@@ -239,6 +239,7 @@ ol.wiki-nlist li {
   margin-right: 2em; 
   font-family: 'Courier New', Courier, monospace;
   font-size: 12.5pt;
+  font-weight: normal;
   border: 1px solid black; 
   padding:1em; 
   width:95%;
