@@ -3,6 +3,7 @@ let
   <!doctype html>
 <html>
   <head>
+    <meta charset="UTF-8">  
     <title>$title</title>
     <link rel='stylesheet' href='styles.css' type='text/css' >
   </head>
@@ -32,6 +33,7 @@ let
   <!doctype html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <title>$title</title>
     <link rel='stylesheet' href='styles.css' type='text/css' >
   </head>
@@ -48,10 +50,12 @@ let
   
 /* Global styles */
 
-DIV { line-height: 1.4; }
+DIV { line-height: 1.4; font-weight: 400; }
+B { font-weight:700; }
 
 .wiki-body { 
   font-family: Verdana, Geneva, Tahoma, sans-serif; 
+  font-weight: normal;
   background-color: #eee;
   margin:0em 1em ;
   padding: 1em ;
@@ -217,6 +221,7 @@ TABLE.wide { width: 80%; }
   border:2px solid darkgray;
   margin: 5px;
   width:70%;
+  font-weight:normal;
 }
 
 ul.wiki-bullet li {

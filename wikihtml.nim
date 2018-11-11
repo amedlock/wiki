@@ -235,7 +235,6 @@ proc is_external_link( s : string ) : bool =
   result = s.startsWith("http://") or s.startsWith("https://")
     
 proc create_link( writer: HtmlWriter, txt : string ) : string =
-  echo "Link:$1".format( txt )
   if txt.len==0:
     return "<a href='#'>(Empty Link)</a>"
   var 
