@@ -78,18 +78,14 @@ type
     chunks*: seq[Chunk]
     folders*: seq[string]
 
-
-proc debug*( s : Span ) =
-  if s!=nil: 
-    echo("Span( $1 '$2' )".format( s.styles, s.text ))
-    debug( s.next )
-    
+   
 
 proc parse_spans*( line : string, styles: set[SpanStyle] = {} ) : Span
 
 
 # create a new page 
 proc make_page( wiki:Wiki, name, filename : string ) : Page =
+  assert( name.len > 0 )
   assert( not filename.contains(":") ) 
   result = Page( wiki:wiki, name : name, filename: filename )
   wiki.pages[name] =  result 
@@ -140,7 +136,7 @@ proc prev*( p : Page ) : Page =
     
 # Change a filename into a normalized page name
 proc sanitize*( s : string, sep = "_" ) : string = 
-  let toks = s.split( AllChars - (Letters+Digits)).filterIt( not it.isNilOrEmpty )
+  let toks = s.split( AllChars - (Letters+Digits)).filterIt( it.len>0 )
   result = toks.join(sep)
 
 # scan files in the src path for wiki *.md files
@@ -192,9 +188,14 @@ proc len*( s : Span ): int =
     result = 1 + len(s.next)
 
 
+method `$`*( s: Span ): string {.base.} =
+  if s==nil: return "<nil>"
+  result = "Span($1,text:$2)".format( s.styles, s.text )
+  if s.next!=nil:
+    result &= "\n$1".format( $s.next )
+
+
 proc makeSpan( text: string, styles: set[SpanStyle]) : Span =
-  if text==nil :
-    return nil
   new(result)
   result.styles = styles
   result.text = text
@@ -231,8 +232,12 @@ proc toggle( styles: set[SpanStyle], s : SpanStyle ) : set[SpanStyle] =
   else:
     return styles + {s}
 
+
 proc parse_inner( line : string, pos: int, styles: set[SpanStyle] = {} ) : Span =
+  if pos >= line.len: return nil
+  echo( "line:" & line[pos..line.len-1] )
   let next = line.find(Specials, pos)
+  echo( "tail:" & line[next+1..line.len-1])
   if next<0:
     return makeSpan(line[pos..line.len-1], styles)
   result = makeSpan( line[pos..next-1], styles )
@@ -248,7 +253,7 @@ proc parse_inner( line : string, pos: int, styles: set[SpanStyle] = {} ) : Span 
 
 # Parse text into a linked list of spans with zero or more styles
 proc parse_spans*( line : string, styles : set[SpanStyle] ) : Span =
-  if line==nil: return nil
+  if line=="": return nil
   return line.parse_inner( 0, styles )
 
 
@@ -256,7 +261,7 @@ proc parse_spans*( line : string, styles : set[SpanStyle] ) : Span =
 
 # skip some number of characters of s
 proc skip( s: string, n : int ) : string =
-  if s==nil or (len(s) <= n): result = ""
+  if s=="" or (len(s) <= n): result = ""
   else: result = s[n..s.len-1]
 
 
@@ -286,7 +291,7 @@ proc parse_cells( row: RowChunk, txt : string ) =
 proc parse_table( p:Parser, head : string, lines: var Deque[string] ) =
   let table = make_table()
   p.add_chunk( table )
-  if head!=nil and not head.strip().isNilOrEmpty:
+  if head.len>0 and not head.strip().len==0:
     table.header = make_row()
     table.header.parse_cells(head)
   table.body = @[]
@@ -306,7 +311,7 @@ proc parse_chunks( p: Parser, lines: var Deque[string] ) =
     if t.startsWith("//"):
       p.add_chunk( make_comment(t.skip(2)) )
     elif t.startsWith("@@"):
-      p.folders = skip(t,2).split().filterIt( not it.isNilOrEmpty )
+      p.folders = skip(t,2).split().filterIt( not it.len==0 )
     elif t.startsWith(">>"):
       p.indent(t.count(">")-1)
     elif t.startsWith("<<"):
@@ -344,7 +349,7 @@ proc parse_chunks( p: Parser, lines: var Deque[string] ) =
 proc parse*( p: Page ) : Parser =
   result = Parser( page: p, margin:0, chunks: @[], folders: @[] )
   var content = readFile( joinPath( p.wiki.src_path, p.filename ) )
-  if content!=nil:
+  if content!="":
     var lines = initDeque[string]()
     for it in content.splitLines():
       lines.addLast(it)

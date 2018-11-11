@@ -67,8 +67,8 @@ method `$`*( m : Markup ) : string {.base.} = ""
 method `$`*( cdata: CData ) : string = cdata.value
 
 method `$`*( t : Tag ) : string = 
-  var attr_list : seq[string] = @[] 
-  if len(t.classes)>0:
+  var attr_list : seq[string] = @[]
+  if t.classes.len>0:
     attr_list.add( "class='$1'".format( t.classes.join(" ")))
   for k,v in t.attrs:
     attr_list.add( "$1='$2'".format(k,v) )
@@ -84,7 +84,7 @@ proc prop*( tag:Tag, k, v : string ) : Tag =
 
 
 proc add*( t : Tag, val : string ) : Tag =
-  if val!=nil:
+  if val.len>0:
     t.child.add( CData(value:val) )
   return t
 
@@ -95,12 +95,10 @@ proc add*( t : Tag, val : Markup ) : Tag =
  
 
 proc add_class*( t : Tag, cls : string ) : Tag =
-  if cls.isNilOrEmpty:
+  if cls.len==0:
     return t
   var s = cls.strip()
-  if t.classes == nil:
-    t.classes = @[ s ]
-  elif not t.classes.contains(s):
+  if not t.classes.contains(s):
     t.classes.add( s )
   return t
 
@@ -157,7 +155,7 @@ proc is_external_link( s : string ) : bool =
   result = s.startsWith("http://") or s.startsWith("https://")
     
 proc create_link( writer: HtmlWriter, txt : string ) : Markup =
-  if txt.isNilOrEmpty:
+  if txt.len==0:
     return CData(value: "&nbsp;")
   var 
     label = txt.strip()
@@ -209,7 +207,7 @@ method to_html( writer:HtmlWriter, table: TableChunk ) : string =
     for x in table.header.cells:
       discard tr.make_tag("td").add( $writer.to_html(x) )
   for i,row in table.body:
-    let cell_size = formatFloat( 100.0/ float(len(row.cells)), ffDecimal, 2 )
+    let cell_size = formatFloat( 100.0 / float(len(row.cells)), ffDecimal, 2 )
     let width_str = "width:$1%".format(cell_size)    
     let tr = tag.make_tag("tr").add_class( ["odd", "even"][i mod 2] )
     for cell in row.cells:
@@ -235,7 +233,7 @@ method to_html( writer:HtmlWriter, title: Title ) : string =
 
 proc to_tag( writer:HtmlWriter, span: Span ) : Markup =
   if SpanStyle.Raw in span.styles:
-    return make_tag("span").add( span.text.escape_html ) # no styles
+    return make_tag("span").add( span.text.escape_html ) # raw = no styles
   var tag : Tag
   if SpanStyle.Bold in span.styles:
     tag = tag.make_tag("b")
@@ -264,9 +262,8 @@ proc to_html( writer: HtmlWriter, span: Span ) : string =
 
 proc generate_html( writer:HtmlWriter, page: Page ) : string = 
   var parser = page.parse()
-  if parser.folders!=nil:
-    for name in parser.folders:
-      writer.add_folder( name, page.name )
+  for name in parser.folders:
+    writer.add_folder( name, page.name )
   writer.current = parser
   var items = parser.chunks.mapIt( writer.to_html(it) )
   writer.current = nil
