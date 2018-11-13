@@ -197,7 +197,7 @@ proc parse_cells( row: RowChunk, txt : string ) =
 proc parse_table( p:Parser, head : string, lines: var Deque[string] ) =
   let table = make_table()
   p.add_chunk( table )
-  if head.len>0 and not head.strip().len==0:
+  if head.len>0 and head.strip().len>0:
     table.header = make_row()
     table.header.parse_cells(head)
   table.body = @[]
