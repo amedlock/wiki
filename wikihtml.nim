@@ -182,7 +182,6 @@ method to_html( writer:HtmlWriter, code: Code ) : string =
 method to_html( writer:HtmlWriter, table: TableChunk ) : string =
   let tag = make_tag("table").add_class("wiki-table").indent(table)
   if table.header!=nil:
-    echo("Has header:" & $writer.to_html(table.header.cells[0]))
     let tr = tag.make_tag("thead").make_tag("tr")
     for x in table.header.cells:
       discard tr.make_tag("td").add( $writer.to_html(x) )
